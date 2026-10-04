@@ -1,16 +1,13 @@
-# Full Nginx configuration used as the Mac 2 working copy.
-# Host: 10.3.3.178 (Kavya Mukhija)
+# Portable Nginx configuration.
+# Replace every occurrence of REPO_ROOT with the absolute path of this
+# repository on the Nginx host (Mac 2). Example:
+#   /Users/kavyamukhija/Desktop/CN-Private-Network-Platform
 #
-# Certificate paths below match the live Mac 2 clone location reported
-# for this project. If another machine clones the repo elsewhere, copy
-# nginx/nginx.conf.template and replace REPO_ROOT. Do not silently
-# change these paths on the live Nginx host or HTTPS will fail.
+# Then validate:
+#   nginx -t -c REPO_ROOT/nginx/nginx.conf
 #
-# Validate (on Mac 2, after editing if needed):
-#   nginx -t -c /Users/kavyamukhija/Desktop/CN-Private-Network-Platform/nginx/nginx.conf
-#
-# Round-robin is Nginx's default upstream method when no ip_hash,
-# least_conn, or hash directive is set.
+# The live Mac 2 file is nginx/nginx.conf and currently uses Kavya's
+# Desktop path. Keep that file aligned with the running service.
 
 worker_processes 1;
 error_log /tmp/cn-nginx-error.log;
@@ -49,8 +46,8 @@ http {
         listen 443 ssl;
         server_name app.teamX.test api.teamX.test;
 
-        ssl_certificate     /Users/kavyamukhija/Desktop/CN-Private-Network-Platform/tls/certs/server.crt;
-        ssl_certificate_key /Users/kavyamukhija/Desktop/CN-Private-Network-Platform/tls/certs/server.key;
+        ssl_certificate     REPO_ROOT/tls/certs/server.crt;
+        ssl_certificate_key REPO_ROOT/tls/certs/server.key;
 
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_prefer_server_ciphers off;

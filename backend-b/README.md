@@ -1,6 +1,15 @@
 # Backend B
 
-This folder contains the source code for Backend B,
-running on Mac 4 on port 3001.
+Mac 4 (Divyanshi) — `10.3.3.104:3002`
 
-Implementation will be added during Phase 1 development.
+Port **3002**, not 3001.
+
+```bash
+node server.js
+```
+
+Binds `0.0.0.0`. JSON fields: `backend`, `status`, `ip`, `port`. Headers: `X-Backend: B`, `Cache-Control: public, max-age=30`, `ETag`. Matching `If-None-Match` returns 304.
+
+```bash
+BIND_HOST=0.0.0.0 BACKEND_IP=10.3.3.104 PORT=3002 node server.js
+```

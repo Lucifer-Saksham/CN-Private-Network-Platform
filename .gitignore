@@ -6,11 +6,15 @@
 .env.*
 !.env.example
 
-# Private keys and local certificates
+# Private keys and PKCS bundles (never commit)
 *.key
 *.pem
 *.p12
 *.pfx
+
+# Public certificates may be committed (tls/certs/server.crt)
+!tls/certs/*.crt
+!tls/certs/.gitkeep
 
 # Logs
 *.log

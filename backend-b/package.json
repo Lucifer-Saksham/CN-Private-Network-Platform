@@ -1,0 +1,13 @@
+{
+  "name": "backend-b",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Backend B REST service for CN Private Network Platform (Mac 4, port 3002)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
