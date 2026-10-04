@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Private keys and local certificates
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Logs
+*.log
+logs/
+
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+# Temporary files
+*.tmp
+*.swp
+
+# Local editor settings
+.vscode/
+.idea/
