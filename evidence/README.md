@@ -13,9 +13,9 @@ This directory contains screenshots, packet captures, and final demonstration ma
 | `load-balancing/` | Repeated requests showing backend selection |
 | `tls/` | HTTPS certificate verification and TLS evidence |
 | `tcp/` | TCP three-way handshake |
-| `caching/` | Cache-Control, ETag, and optional 304 evidence |
+| `caching/` | Cache-Control, ETag, and 304 evidence |
 | `wireshark/` | Packet captures and Wireshark analysis |
-| `demo/` | Verified demonstration video link |
+
 
 ## Existing evidence
 
@@ -29,6 +29,8 @@ The repository currently contains:
 - TCP handshake screenshot
 - TLS handshake screenshot
 - TCP/TLS packet capture
+- Caching and ETag / 304 screenshot
+- DNS packet evidence
 
 See `MANIFEST.md` for file-level status and pending requirements.
 
