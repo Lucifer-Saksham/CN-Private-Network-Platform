@@ -1,30 +1,42 @@
-# Evidence
+# Project Evidence
 
-Put real screenshots and captures in the folders below. Do not add fake “screenshot.txt” stand-ins.
+This directory contains screenshots, packet captures, and final demonstration materials for the CN Private Network Platform.
 
-## Checklist
+## Evidence locations
 
-1. [ ] IP configuration for four Macs → `lan/`
-2. [ ] Successful peer ping → `lan/`
-3. [ ] DNS query and answer for `app.teamX.test` → `dns/`
-4. [ ] Backend A response → `backend/`
-5. [ ] Backend B response → `backend/`
-6. [ ] Nginx HTTP 8080 response → `nginx/`
-7. [ ] Repeated A/B load balancing → `load-balancing/`
-8. [ ] HTTPS certificate verification (`curl --cacert`, no `-k`) → `tls/`
-9. [ ] TCP three-way handshake → `tcp/` and/or `wireshark/`
-10. [ ] TLS handshake → `tls/` and/or `wireshark/`
-11. [ ] HTTP headers including Cache-Control → `caching/`
-12. [ ] Cache 304 or documented skip → `caching/`
-13. [ ] Final end-to-end demo video → `demo/` (or Drive link in README)
+| Folder | Purpose |
+|---|---|
+| `lan/` | Four Mac IP configurations and peer ping |
+| `dns/` | Private DNS question/answer and DNS packet capture |
+| `backend/` | Backend A and Backend B responses |
+| `nginx/` | HTTP response and Nginx validation |
+| `load-balancing/` | Repeated requests showing backend selection |
+| `tls/` | HTTPS certificate verification and TLS evidence |
+| `tcp/` | TCP three-way handshake |
+| `caching/` | Cache-Control, ETag, and optional 304 evidence |
+| `wireshark/` | Packet captures and Wireshark analysis |
+| `demo/` | Verified demonstration video link |
 
-## Already in Git
+## Existing evidence
 
-- `wireshark/tls-handshake.pcapng` — TCP handshake to `10.3.3.178:443` plus TLS records. See `MANIFEST.md`.
+The repository currently contains:
+
+- Network/connectivity screenshot
+- DNS-related screenshot
+- Backend A and Backend B screenshots
+- Nginx-related screenshot
+- Two load-balancing screenshots
+- TCP handshake screenshot
+- TLS handshake screenshot
+- TCP/TLS packet capture
+
+See `MANIFEST.md` for file-level status and pending requirements.
 
 ## Capture rules
 
-- PNG or JPEG for terminals/Wireshark windows.
-- pcapng for packets.
-- No private keys, no `.env`, no passwords.
-- File names: `YYYYMMDD_short-description.png` (use the real date).
+- Use real screenshots and packet captures.
+- Prefer descriptive filenames such as `backend-a-response.png`.
+- Do not invent results or create fake evidence.
+- Do not commit private keys, passwords, tokens, or `.env` files.
+- Do not use `curl -k` for certificate-verification proof.
+- Keep the evidence manifest synchronized with actual files.
