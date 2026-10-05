@@ -516,7 +516,7 @@ CN-Private-Network-Platform/
 ├── tls/                  openssl.cnf, generate-self-signed.sh, certs/server.crt
 ├── scripts/              check-lan, test-*, validate-project
 ├── docs/                 architecture, CACHING, ip-table, PROJECT_AUDIT,
-│                         SUBMISSION_CHECKLIST, DEMO_SCRIPT, troubleshooting
+│                         troubleshooting
 └── evidence/             backend, caching, dns, lan, load-balancing, network,
                           nginx, tcp, tls, wireshark
 ```
@@ -525,9 +525,21 @@ CN-Private-Network-Platform/
 
 ## 17. Evidence
 
-Evidence is organised under `evidence/`. See [`evidence/MANIFEST.md`](evidence/MANIFEST.md) for exactly which files exist and [`evidence/README.md`](evidence/README.md) for capture instructions.
+The project evidence is organised under `evidence/` and matches the final implementation.
 
-Evidence covers: LAN/ping, DNS resolution, Backend A and B, Nginx, HTTPS, load balancing, caching headers, TCP handshake, TLS handshake, and the failure demonstration.
+| Evidence | Location |
+|---|---|
+| LAN configuration and peer connectivity | `evidence/lan/` and `evidence/network/` |
+| DNS resolution and DNS packet analysis | `evidence/dns/` and `evidence/network/dns.packets.jpeg` |
+| Backend A and Backend B | `evidence/backend/` |
+| Nginx HTTP response | `evidence/nginx/` |
+| Load balancing | `evidence/load-balancing/` |
+| Cache-Control and ETag / 304 | `evidence/caching/` |
+| TCP three-way handshake | `evidence/tcp/` |
+| TLS / HTTPS evidence | `evidence/tls/` |
+| Wireshark packet analysis | `evidence/wireshark/` |
+
+See [`evidence/MANIFEST.md`](evidence/MANIFEST.md) for the complete evidence inventory.
 
 ---
 
@@ -535,7 +547,7 @@ Evidence covers: LAN/ping, DNS resolution, Backend A and B, Nginx, HTTPS, load b
 
 Link: `<paste Google Drive link here after testing it in an incognito window>`
 
-File name: `CN_Phase1_[Section]_[TeamName]_Type1.mp4`
+File name: `CN_Phase1_Section-D_[TeamName]_Type1.mp4`
 
 Requirements: MP4, 1080p recommended, maximum 5 minutes, maximum 500 MB, shared as "Anyone with the link can view".
 
