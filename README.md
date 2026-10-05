@@ -545,7 +545,7 @@ See [`evidence/MANIFEST.md`](evidence/MANIFEST.md) for the complete evidence inv
 
 ## 18. Demo Video
 
-Link: `<paste Google Drive link here after testing it in an incognito window>`
+Link: (https://drive.google.com/file/d/1gWjS1cxOGXKcK1D9ImrKSpdjjCaPpW-K/view?usp=drive_link)
 
 File name: `CN_Phase1_Section-D_[TeamName]_Type1.mp4`
 
