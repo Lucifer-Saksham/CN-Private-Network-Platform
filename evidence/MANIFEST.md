@@ -17,7 +17,7 @@ This manifest reflects the final evidence currently present in the repository. T
 | 11 | Cache-Control header | Complete | `evidence/caching/Screenshot 2026-10-04 at 9.30.17 PM.png` |
 | 12 | Conditional ETag / 304 | Complete | `evidence/caching/Screenshot 2026-10-04 at 9.30.17 PM.png` |
 | 13 | Private-name DNS packet analysis | Complete | `evidence/dns/dns.packets.jpeg`; `evidence/network/dns.packets.jpeg` |
-| 14 | Demo video and verified link | Pending | Final demonstration video |
+14 | Demo video and verified link | Complete | Google Drive link provided in README |
 
 ## Packet Capture Note
 
