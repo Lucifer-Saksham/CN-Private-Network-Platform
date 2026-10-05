@@ -547,7 +547,7 @@ See [`evidence/MANIFEST.md`](evidence/MANIFEST.md) for the complete evidence inv
 
 Link: (https://drive.google.com/file/d/1gWjS1cxOGXKcK1D9ImrKSpdjjCaPpW-K/view?usp=drive_link)
 
-File name: `CN_Phase1_Section-D_[TeamName]_Type1.mp4`
+File name: `CN_Phase1_Section-D_NarCodes_Type1.mp4`
 
 Requirements: MP4, 1080p recommended, maximum 5 minutes, maximum 500 MB, shared as "Anyone with the link can view".
 
