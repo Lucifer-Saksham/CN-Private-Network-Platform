@@ -88,7 +88,7 @@ Client -> DNS query (Mac 1) -> HTTPS request (Mac 2 / Nginx) -> Backend A (Mac 3
 | Enrollment No. | Name | Machine | Role |
 | -------------- | ---- | ------- | ---- |
 | 2401010401 | Saksham Miglani | Mac 1 | Private DNS (dnsmasq) and test client |
-| 2401010452 | Kavya Mukhija | Mac 2 | Nginx reverse proxy, load balancer, HTTPS |
+| 2401010219 | Kavya Mukhija | Mac 2 | Nginx reverse proxy, load balancer, HTTPS |
 | 2401010452 | Shubham Jain | Mac 3 | Backend A (Node.js, port 3001) |
 | 2401010159 | Divyanshi Khanka | Mac 4 | Backend B (Node.js, port 3002) and test client |
 
@@ -551,7 +551,7 @@ File name: `CN_Phase1_Section-D_[TeamName]_Type1.mp4`
 
 Requirements: MP4, 1080p recommended, maximum 5 minutes, maximum 500 MB, shared as "Anyone with the link can view".
 
-Contents: team intro and setup flow (2 min), how the configuration works (2 min), failure demonstration (1 min). Script: [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
+Contents: team intro and setup flow (2 min), how the configuration works (2 min), failure demonstration (1 min).
 
 ---
 
