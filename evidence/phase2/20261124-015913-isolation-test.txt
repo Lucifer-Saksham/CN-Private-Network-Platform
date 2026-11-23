@@ -1,0 +1,8 @@
+# isolation-test | Tue Nov 24 01:59:13 IST 2026 | host=Saksham-ka-MacBook-Pro ip=10.3.3.146
+============================================================
+  EXTENSION C - WHO CAN REACH THE BACKENDS DIRECTLY? (this Mac: 10.3.3.146)
+============================================================
+  Backend A 10.3.3.170:3001   direct connect: no    allowed to: no    -> as designed
+  Backend B 10.3.3.134:3002   direct connect: no    allowed to: no    -> as designed
+  Through the edge (the intended path): works   A B A B 
+  WHY  firewall rules filter on the SOURCE IP: the edge is on the list, every other client is dropped before it reaches the app.

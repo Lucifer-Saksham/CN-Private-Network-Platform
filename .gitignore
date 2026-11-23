@@ -1,34 +1,26 @@
-# macOS
-.DS_Store
-
-# Environment variables and secrets
+# Secrets - never commit
 .env
 .env.*
 !.env.example
-
-# Private keys and PKCS bundles (never commit)
+!.env.example
 *.key
-*.pem
 *.p12
-*.pfx
+*.pem
+*.token
+secrets/
+.credentials/
+.cloudflare/
+credentials*.json
 
-# Public certificates may be committed (tls/certs/server.crt)
-!tls/certs/*.crt
-!tls/certs/.gitkeep
+# Runtime
+logs/*
+!logs/.gitkeep
+config/generated/
+*.pcap
+*.pcapng
+.DS_Store
+__pycache__/
+work/
 
-# Logs
-*.log
-logs/
-
-# Dependencies
-node_modules/
-.venv/
-venv/
-
-# Temporary files
-*.tmp
-*.swp
-
-# Local editor settings
-.vscode/
-.idea/
+# Timestamped evidence bundles are large/noisy; commit selectively with git add -f
+evidence/20*/

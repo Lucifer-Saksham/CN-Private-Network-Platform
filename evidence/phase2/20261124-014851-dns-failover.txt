@@ -1,0 +1,47 @@
+# dns-failover | Tue Nov 24 01:48:51 IST 2026 | host=Saksham-ka-MacBook-Pro ip=10.3.3.146
+============================================================
+  EXTENSION A - BACKUP DNS RESOLVER
+============================================================
+
+1. Two DNS servers, same records
+  $ cat /etc/resolver/teamX.test
+    # managed by cn-phase1 (remove: bin/teardown)
+    nameserver 127.0.0.1
+    nameserver 10.3.3.139
+  $ /usr/bin/dig +noall +answer -p 53 @10.3.3.146 app.teamX.test
+    app.teamX.test.		300	IN	A	10.3.3.139
+  $ /usr/bin/dig +noall +answer -p 53 @10.3.3.139 app.teamX.test
+    app.teamX.test.		300	IN	A	10.3.3.139
+  WHY  clients list BOTH servers in /etc/resolver/teamX.test; the first is tried first, the second only if the first does not answer.
+
+2. Everything works while the primary is up
+  $ app_curl -o /dev/null -w dns=%{time_namelookup}s http=%{http_code}\n https://app.teamX.test:8443/api/status
+    dns=0.004448s http=200
+
+3. STOP the primary DNS (dnsmasq on this Mac)
+✓ primary dnsmasq stopped
+  $ /usr/bin/dig +time=1 +tries=1 -p 53 @10.3.3.146 app.teamX.test
+    
+    ; <<>> DiG 9.10.6 <<>> +time=1 +tries=1 -p 53 @10.3.3.146 app.teamX.test
+    ; (1 server found)
+    ;; global options: +cmd
+    ;; connection timed out; no servers could be reached
+  $ /usr/bin/dig +noall +answer -p 53 @10.3.3.139 app.teamX.test
+    app.teamX.test.		300	IN	A	10.3.3.139
+
+4. Clients keep resolving - through the backup
+  $ dscacheutil -q host -a name app.teamX.test
+    name: app.teamx.test
+    ip_address: 10.3.3.139
+    
+  $ app_curl -o /dev/null -w dns=%{time_namelookup}s http=%{http_code}\n https://app.teamX.test:8443/api/status
+    dns=0.005074s http=200
+✓ PASS: name still resolves and the HTTPS service answers with the primary DNS down
+  WHY  DNS FAILURE = names stop resolving (here hidden by the backup). APPLICATION FAILURE = names resolve fine but the service answers 502/refuses.
+  WHY  A cached answer would also hide a DNS outage until its TTL expires - that is Extension B.
+
+==> Restoring primary DNS
+
+5. Primary is back
+  $ /usr/bin/dig +noall +answer -p 53 @10.3.3.146 app.teamX.test
+    app.teamX.test.		300	IN	A	10.3.3.139
