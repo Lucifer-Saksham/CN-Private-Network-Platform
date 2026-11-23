@@ -5,9 +5,9 @@ that has not been produced on the LAN.
 
 ## 1. Introduce the topology
 
-Saksham runs private DNS at `10.3.3.96`. Kavya runs the TLS edge at
-`10.3.3.178:8443`. Shubham runs Backend A at `10.3.3.71:3001`. Divyanshi runs
-Backend B at `10.3.3.104:3002`. All four Macs use the `10.3.0.0/22` LAN through
+Saksham runs private DNS at `10.3.3.146`. Kavya runs the TLS edge at
+`10.3.3.139:8443`. Shubham runs Backend A at `10.3.3.170:3001`. Divyanshi runs
+Backend B at `10.3.3.134:3002`. All four Macs use the `10.3.0.0/22` LAN through
 gateway `10.3.0.1`.
 
 Show `docs/ARCHITECTURE.md`, then show each Mac's current network information:
@@ -33,9 +33,9 @@ public CA after checking its fingerprint.
 ## 3. DNS, TCP, and TLS
 
 ```bash
-dig @10.3.3.96 +noall +answer app.teamX.test
-nc -vz 10.3.3.178 8443
-openssl s_client -connect 10.3.3.178:8443 -servername app.teamX.test -CAfile pki/ca.crt
+dig @10.3.3.146 +noall +answer app.teamX.test
+nc -vz 10.3.3.139 8443
+openssl s_client -connect 10.3.3.139:8443 -servername app.teamX.test -CAfile pki/ca.crt
 ```
 
 DNS returns an address, TCP reaches a process on a port, and TLS verifies the requested

@@ -1,15 +1,17 @@
 # Architecture
 
-## Roles and address inventory (fill in during Task A)
+## Verified roles and address inventory (24 November 2026)
 
-| Mac | Person | Role | IP (LAN) | Interface | MAC | Service / port |
+| Mac | Person | Role | IP (LAN) | Interface | Gateway | Service / port |
 |---|---|---|---|---|---|---|
-| 1 | Saksham Miglani | DNS + client + controller | `10.3.3.96/22` | `en0` | `10.3.0.1` | dnsmasq 53/udp,tcp |
-| 2 | Kavya Mukhija | nginx edge + backup DNS | `10.3.3.178/22` | `en0` | `10.3.0.1` | 8443/tcp (TLS), 53/udp,tcp |
-| 3 | Shubham Jain | Backend A | `10.3.3.71/22` | `en0` | `10.3.0.1` | 3001/tcp |
-| 4 | Divyanshi Khanka | Backend B + standby edge | `10.3.3.104/22` | `en0` | `10.3.0.1` | 3002/tcp, 8443/tcp |
+| 1 | Saksham Miglani | DNS + client + controller | `10.3.3.146/22` | `en0` | `10.3.0.1` | dnsmasq 53/udp,tcp |
+| 2 | Kavya Mukhija | nginx edge + backup DNS | `10.3.3.139/22` | `en0` | `10.3.0.1` | 8443/tcp (TLS), 53/udp,tcp |
+| 3 | Shubham Jain | Backend A | `10.3.3.170/22` | `en0` | `10.3.0.1` | 3001/tcp |
+| 4 | Divyanshi Khanka | Backend B + standby edge | `10.3.3.134/22` | `en0` | `10.3.0.1` | 3002/tcp, 8443/tcp |
 
-Each Mac prints its row with `scripts/macos-network-info.sh`. Tunnel mode adds virtual IPs 10.250.0.3 (A) and 10.250.0.4 (B).
+Each Mac prints its current row with `scripts/macos-network-info.sh`. These DHCP
+addresses must be rechecked if the Wi-Fi network changes. Tunnel mode adds virtual IPs
+10.250.0.3 (A) and 10.250.0.4 (B).
 
 ## Cloud equivalents
 
