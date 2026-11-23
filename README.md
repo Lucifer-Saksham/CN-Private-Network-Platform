@@ -1,586 +1,110 @@
-# CN Private Network Platform
+# CN Private Network Service Platform - Phase 1 + Phase 2
 
-**Computer Networks Project — Phase 1**
-**Infrastructure type:** Type 1 — 4 physical macOS laptops on the same LAN
+**What this does.** A client types `https://app.teamX.test:8443`. Our own DNS server (dnsmasq) turns that
+name into the edge Mac's IP, the client opens a TCP connection and a TLS session to nginx, and nginx
+forwards the HTTP request - alternating - to Backend A or Backend B. Every step can be observed with
+`dig`, `curl -v`, and Wireshark. *The application stays simple; the network is the project.*
 
-A private LAN-based network platform demonstrating **local DNS, Nginx reverse proxying, load balancing, HTTPS/TLS, backend services, HTTP caching, conditional requests, and packet-level analysis** across four macOS systems.
+| Mac | Person | LAN IP | Role | Ports |
+|---|---|---:|---|---|
+| 1 | **Saksham Miglani** | `10.3.3.96` | Primary DNS, controller, test client | 53/udp+tcp |
+| 2 | **Kavya Mukhija** | `10.3.3.178` | Primary nginx edge and backup DNS | 8443/tcp, 53/udp+tcp |
+| 3 | **Shubham Jain** | `10.3.3.71` | Python Backend A | 3001/tcp |
+| 4 | **Divyanshi Khanka** | `10.3.3.104` | Python Backend B and standby nginx edge | 3002/tcp, 8443/tcp |
 
-Repository: <https://github.com/Lucifer-Saksham/CN-Private-Network-Platform>
+LAN: `10.3.0.0/22`; gateway: `10.3.0.1`; names: `app.teamX.test` and
+`api.teamX.test`. These recorded DHCP addresses must be rechecked before a live run.
 
----
+## Two network modes (`NETWORK_MODE`)
 
-## Table of Contents
+* **`lan`** - the architecture from the university brief. All four Macs share one private Wi-Fi/LAN and talk directly. **This is the mode to submit and demo unless faculty approves otherwise.**
+* **`tunnel`** - for when Shubham/Divyanshi are physically remote. Only the *nginx -> backend* hop changes: it travels over a Cloudflare Zero Trust private network. Saksham <-> Kavya (DNS, TCP, TLS, HTTP) stay on the local LAN, so those layers remain observable.
 
-1. [Project Overview](#1-project-overview)
-2. [Objectives](#2-objectives)
-3. [Team Members](#3-team-members)
-4. [Network Configuration](#4-network-configuration)
-5. [Architecture](#5-architecture)
-6. [Private DNS](#6-private-dns)
-7. [Backend Servers](#7-backend-servers)
-8. [Nginx Reverse Proxy and Load Balancing](#8-nginx-reverse-proxy-and-load-balancing)
-9. [HTTPS / TLS](#9-https--tls)
-10. [HTTP Caching and Conditional Requests](#10-http-caching-and-conditional-requests)
-11. [How to Run (Setup per Mac)](#11-how-to-run-setup-per-mac)
-12. [Client Setup (DNS and Certificate Trust)](#12-client-setup-dns-and-certificate-trust)
-13. [Testing Commands](#13-testing-commands)
-14. [Wireshark and Packet Analysis](#14-wireshark-and-packet-analysis)
-15. [Failure Demonstration](#15-failure-demonstration)
-16. [Project Structure](#16-project-structure)
-17. [Evidence](#17-evidence)
-18. [Demo Video](#18-demo-video)
-19. [Security Considerations](#19-security-considerations)
-20. [Limitations](#20-limitations)
-21. [Conclusion](#21-conclusion)
+> Tunnel mode is **not** equivalent to a four-Mac LAN (the brief requires a shared LAN, LAN inventory and pairwise pings, and a locally-run system). It exists for remote development/demo. Nothing in the application, nginx or DNS code changes between modes - only the upstream addresses.
 
----
-
-## 1. Project Overview
-
-Four Macs work together as a small distributed system. A client types a private domain name, the name is resolved by our own DNS server, an HTTPS connection is made to our Nginx edge, and the request is forwarded to one of two backend servers.
-
-The platform provides:
-
-- Private LAN connectivity
-- Local DNS using `dnsmasq`
-- Two independent Node.js backend servers
-- Nginx reverse proxy with round-robin load balancing
-- HTTP and HTTPS access
-- Self-signed TLS certificate with Subject Alternative Names
-- HTTP caching using `Cache-Control`
-- Conditional requests using `ETag` / `If-None-Match` (`304 Not Modified`)
-- TCP, TLS and DNS packet analysis using Wireshark
-
-Application URLs (both names resolve to the Nginx server):
-
-```text
-https://app.teamX.test
-https://api.teamX.test
-http://app.teamX.test:8080
+```mermaid
+flowchart LR
+  subgraph LAN["LAN MODE (matches the brief)"]
+    C1["Mac 1 Saksham<br/>client"] -->|"DNS 53/udp"| D1["Mac 1 Saksham<br/>dnsmasq"]
+    C1 -->|"TCP+TLS+HTTP :8443"| E1["Mac 2 Kavya<br/>nginx"]
+    E1 -->|"HTTP :3001 (LAN)"| BA1["Mac 3 Shubham<br/>Backend A"]
+    E1 -->|"HTTP :3002 (LAN)"| BB1["Mac 4 Divyanshi<br/>Backend B"]
+  end
 ```
 
-Request flow:
-
-```text
-Client -> DNS query (Mac 1) -> HTTPS request (Mac 2 / Nginx) -> Backend A (Mac 3) or Backend B (Mac 4)
+```mermaid
+flowchart LR
+  subgraph TUN["TUNNEL MODE (remote backends)"]
+    C2["Mac 1 Saksham<br/>dnsmasq + client"] -->|"DNS, then TCP+TLS+HTTP :8443 (local LAN)"| E2["Mac 2 Kavya<br/>nginx + Cloudflare WARP"]
+    E2 -->|"10.250.0.3:3001 via WARP"| CF(("Cloudflare<br/>Zero Trust"))
+    E2 -->|"10.250.0.4:3002 via WARP"| CF
+    CF -->|"outbound-only tunnel A"| BA2["Mac 3 Shubham<br/>cloudflared + Backend A"]
+    CF -->|"outbound-only tunnel B"| BB2["Mac 4 Divyanshi<br/>cloudflared + Backend B"]
+  end
 ```
 
----
+More diagrams: [docs/diagrams.md](docs/diagrams.md). Request walk-through: [docs/REQUEST_FLOW.md](docs/REQUEST_FLOW.md).
 
-## 2. Objectives
+## Quick start - one command per Mac
 
-1. Configure a private LAN between four Macs.
-2. Configure a local DNS resolver using dnsmasq.
-3. Resolve private domain names to the Nginx server.
-4. Deploy two independent Node.js backend servers.
-5. Configure Nginx as a reverse proxy.
-6. Implement round-robin load balancing.
-7. Configure HTTPS using a self-signed TLS certificate.
-8. Demonstrate DNS, TCP and TLS handshakes using Wireshark.
-9. Implement HTTP caching using `Cache-Control`.
-10. Implement conditional requests using `ETag` and `304 Not Modified`.
-11. Demonstrate a controlled failure and recovery.
+Everyone: `git clone <repo> && cd <repo>`. Run **in this order** (Kavya creates the CA others need):
 
----
+| Order | Who | Command |
+|---|---|---|
+| 1 | Shubham | `./macs/mac3-shubham/setup.sh` |
+| 1 | Divyanshi | `./macs/mac4-divyanshi/setup.sh` |
+| 2 | Kavya | `./macs/mac2-kavya/setup.sh` then `git add pki/ca.crt && git commit && git push` |
+| 3 | Saksham | `git pull && ./macs/mac1-saksham/setup.sh` |
+| 4 | any other client | `git pull && scripts/configure-client-dns.sh` |
 
-## 3. Team Members
+Setup scripts ask once for non-secret values (team name, mode, LAN IPs) and remember them in
+`~/.config/cn-phase1/project.env` (chmod 600). They are **idempotent** - run them again any time.
+Tunnel mode additionally needs the one-time admin step: [docs/CLOUDFLARE_MODE.md](docs/CLOUDFLARE_MODE.md).
 
-| Enrollment No. | Name | Machine | Role |
-| -------------- | ---- | ------- | ---- |
-| 2401010401 | Saksham Miglani | Mac 1 | Private DNS (dnsmasq) and test client |
-| 2401010219 | Kavya Mukhija | Mac 2 | Nginx reverse proxy, load balancer, HTTPS |
-| 2401010452 | Shubham Jain | Mac 3 | Backend A (Node.js, port 3001) |
-| 2401010159 | Divyanshi Khanka | Mac 4 | Backend B (Node.js, port 3002) and test client |
+## Phase 2 (Harden, Recover, Troubleshoot) - same idea, one command per Mac
 
----
+`./bin/phase2 setup` on every Mac (it works out that Mac's duty from its IP; the Phase 1 setup scripts call it too). Then:
+`bin/phase2 test` (checks A-E) and one command per demo: `dns-failover` (A), `ttl` (B), `isolate on|off|test` (C), `failover` (D), `cutover` (E), `bin/doctor` + `drill` (F).
+Order, reasoning and limits: [docs/PHASE2.md](docs/PHASE2.md). Transcripts of every demo land in `evidence/phase2/`.
 
-## 4. Network Configuration
-
-```text
-Network:      10.3.0.0/22
-Subnet mask:  255.255.252.0
-Gateway:      10.3.0.1
-Interface:    en0 (Wi-Fi) on all machines
-```
-
-| Machine | Role | IPv4 | Subnet | Gateway | Interface | Service / Port |
-| ------- | ---- | ---- | ------ | ------- | --------- | -------------- |
-| Mac 1 | DNS / client | 10.3.3.96 | /22 | 10.3.0.1 | en0 | dnsmasq, UDP/TCP 53 |
-| Mac 2 | Nginx edge | 10.3.3.178 | /22 | 10.3.0.1 | en0 | HTTP 8080, HTTPS 443 |
-| Mac 3 | Backend A | 10.3.3.71 | /22 | 10.3.0.1 | en0 | Node.js 3001 |
-| Mac 4 | Backend B | 10.3.3.104 | /22 | 10.3.0.1 | en0 | Node.js 3002 |
-
-MAC addresses and the full inventory are in [`docs/ip-table.md`](docs/ip-table.md). They are the `en0` addresses recorded at inventory time; macOS may use randomized private Wi-Fi addresses.
-
-> If DHCP changes an address, verify with `ifconfig en0` and update this table, `dns/dnsmasq.conf`, and `nginx/nginx.conf`.
-
----
-
-## 5. Architecture
-
-```text
-                         PRIVATE LAN 10.3.0.0/22
-                                  |
-                          +---------------+
-                          |    Mac 1      |
-                          |  DNS/Client   |
-                          |  10.3.3.96    |
-                          |  dnsmasq :53  |
-                          +-------+-------+
-                                  |
-                    app.teamX.test / api.teamX.test
-                          resolve to 10.3.3.178
-                                  |
-                                  v
-                          +---------------+
-                          |    Mac 2      |
-                          |    Nginx      |
-                          |  10.3.3.178   |
-                          | HTTP  :8080   |
-                          | HTTPS :443    |
-                          +-------+-------+
-                                  |
-                          Round-robin proxy
-                           /              \
-                          v                v
-                  +--------------+  +--------------+
-                  |    Mac 3     |  |    Mac 4     |
-                  |  Backend A   |  |  Backend B   |
-                  |  10.3.3.71   |  |  10.3.3.104  |
-                  |    :3001     |  |    :3002     |
-                  +--------------+  +--------------+
-```
-
-Cloud equivalents: dnsmasq is like a managed DNS service (Route 53); Nginx is like a cloud load balancer / CDN edge (AWS ALB); the backends are like application server instances.
-
-Protocol layers involved in one request:
-
-| Layer | Protocol |
-| ----- | -------- |
-| Application | DNS, HTTP |
-| Session / Security | TLS |
-| Transport | UDP (DNS, port 53), TCP (HTTPS, port 443) |
-| Network | IPv4 |
-| Link | Ethernet / Wi-Fi |
-
----
-
-## 6. Private DNS
-
-`dnsmasq` runs on Mac 1 (`10.3.3.96`) and answers for the private `.test` namespace (not `.local`, which conflicts with macOS mDNS).
-
-Records:
-
-```text
-app.teamX.test  ->  10.3.3.178
-api.teamX.test  ->  10.3.3.178
-```
-
-Relevant lines from `dns/dnsmasq.conf`:
-
-```text
-interface=en0
-listen-address=127.0.0.1
-listen-address=10.3.3.96
-address=/app.teamX.test/10.3.3.178
-address=/api.teamX.test/10.3.3.178
-local-ttl=30
-server=8.8.8.8
-```
-
-- `listen-address` includes the LAN IP so other Macs can use this DNS server.
-- `server=` forwards all other names, so clients keep internet access.
-- Because `.test` is not a real public TLD, `dig @8.8.8.8 app.teamX.test` returns `NXDOMAIN` (or times out), proving the name is private.
-
-DNS resolution only finds the IP address. The TCP/TLS connection to that address is a separate step.
-
----
-
-## 7. Backend Servers
-
-Two independent Node.js services using only the standard library.
-
-| Backend | Machine | IP | Port |
-| ------- | ------- | -- | ---- |
-| A | Mac 3 | 10.3.3.71 | 3001 |
-| B | Mac 4 | 10.3.3.104 | 3002 |
-
-Both bind to `0.0.0.0` so other LAN machines can reach them.
-
-Endpoints:
-
-| Endpoint | Response |
-| -------- | -------- |
-| `GET /` | Basic JSON confirming the service is running |
-| `GET /api/status` | JSON with `backend`, `status`, `ip`, `port` |
-
-Response headers include:
-
-```text
-X-Backend: A        (or B on Backend B)
-Cache-Control: public, max-age=30
-ETag: "..."
-```
-
----
-
-## 8. Nginx Reverse Proxy and Load Balancing
-
-Nginx on Mac 2 (`10.3.3.178`) is the single entry point. Clients never connect to backends directly and never need to know their IPs.
-
-- HTTP listener: `8080`
-- HTTPS listener: `443` (TLS 1.2 and TLS 1.3)
-- Upstream group with Backend A and Backend B
-- Default **round-robin** strategy
-
-```nginx
-upstream backend {
-    server 10.3.3.71:3001;
-    server 10.3.3.104:3002;
-}
-
-server {
-    listen 443 ssl;
-    server_name app.teamX.test api.teamX.test;
-
-    ssl_certificate     /path/to/tls/certs/server.crt;
-    ssl_certificate_key /path/to/tls/certs/server.key;
-    ssl_protocols       TLSv1.2 TLSv1.3;
-
-    location / {
-        proxy_pass http://backend;
-        proxy_set_header Host $host;
-    }
-}
-```
-
-The actual file is [`nginx/nginx.conf`](nginx/nginx.conf). A portable version with a `REPO_ROOT` placeholder is [`nginx/nginx.conf.template`](nginx/nginx.conf.template).
-
-Repeated requests alternate:
-
-```text
-Request 1 -> Backend A
-Request 2 -> Backend B
-Request 3 -> Backend A
-Request 4 -> Backend B
-```
-
-Verify with the `X-Backend` header.
-
----
-
-## 9. HTTPS / TLS
-
-- Nginx terminates TLS on port 443.
-- The certificate is self-signed (RSA 2048) with SANs for `app.teamX.test` and `api.teamX.test`.
-- Generate with `tls/generate-self-signed.sh` using `tls/openssl.cnf`.
-- The **public** certificate is committed; the **private key is never committed** (`*.key` is in `.gitignore`).
-- Every client Mac must trust the certificate so `curl` and browsers do not warn. The demo never uses `curl -k`.
-
-Handshake summary:
-
-1. **TCP handshake** — SYN, SYN-ACK, ACK.
-2. **ClientHello** — TLS versions, cipher suites, SNI.
-3. **ServerHello** — chosen version and cipher.
-4. **Certificate** — server identity (visible in TLS 1.2 captures; encrypted in TLS 1.3).
-5. **Key exchange / Finished** — session keys established.
-6. **Application Data** — HTTP is encrypted from here on.
-
----
-
-## 10. HTTP Caching and Conditional Requests
-
-Backend responses send:
-
-```text
-Cache-Control: public, max-age=30
-```
-
-This means the response is fresh for 30 seconds and may be reused without contacting the server. After that it is stale and must be refetched or revalidated.
-
-Backends also send an `ETag`. A client can revalidate with `If-None-Match`:
-
-```text
-Client -> GET /api/status
-Server -> 200 OK, ETag: "abc"
-
-Client -> GET /api/status, If-None-Match: "abc"
-Server -> 304 Not Modified (no body)
-```
-
-Because round-robin may send the revalidation to the other backend, demonstrate `304` against one backend directly:
+## Daily commands (any Mac, after setup)
 
 ```bash
-curl -i http://10.3.3.71:3001/api/status
-curl -i -H 'If-None-Match: "<etag-from-above>"' http://10.3.3.71:3001/api/status
+./bin/start | stop | status      # this Mac's role + whole-system view (real requests, not pgrep)
+./bin/test-all                   # layered PASS/FAIL, non-zero exit on failure
+./bin/doctor                     # first failing layer + concept + commands to investigate
+./bin/collect-evidence           # timestamped evidence/<time>/ (no secrets)
+./bin/failure-demo <scenario> <break|rollback|explain>
+./bin/teardown                   # stop services, remove scoped resolver
+./bin/phase2 help                # Phase 2: setup | status | test | demos | rollback
+scripts/capture-packets.sh 60    # bounded tcpdump for Wireshark (Task G)
 ```
 
-Nginx here is a proxy only; it is not configured as a content cache.
+## Repo map
 
----
-
-## 11. How to Run (Setup per Mac)
-
-Clone the repo on every Mac:
-
-```bash
-git clone https://github.com/Lucifer-Saksham/CN-Private-Network-Platform.git
-cd CN-Private-Network-Platform
+```
+backends/server.py      one stdlib-only REST backend (A or B by env)
+config/                 project.example.env (all constants), dnsmasq + nginx templates
+scripts/                common.sh, roles.sh, role.sh, checks.sh, phase2.sh, CA/DNS/capture helpers
+macs/mac{1..4}-*/       setup|start|stop|status.sh + README per machine
+bin/                    operator commands       tests/   per-layer tests
+admin/                  one-time Cloudflare bootstrap (Saksham only)
+docs/                   architecture, flow, viva, failures, troubleshooting
+pki/ca.crt              PUBLIC CA certificate (safe to commit)
+evidence/               original Phase 1 archive + newly collected team outputs
 ```
 
-### Startup order
+## Where things live (never in git)
 
-1. Confirm all four Macs can ping each other (`scripts/check-lan.sh`).
-2. Start dnsmasq on Mac 1.
-3. Start Backend A on Mac 3.
-4. Start Backend B on Mac 4.
-5. Start Nginx on Mac 2.
-6. Validate from a client (`scripts/validate-project.sh`).
+`~/.config/cn-phase1/` - saved settings, generated configs, `tls/` (CA + server private keys), `secrets/` (tunnel credentials), backups.
+`~/Library/Logs/cn-phase1/` - dnsmasq, nginx access/error, backend, cloudflared logs.
 
-### Mac 1 — DNS (Saksham)
+## Security rules
 
-```bash
-brew install dnsmasq
-# copy dns/dnsmasq.conf to the path Homebrew prints, e.g. /opt/homebrew/etc/dnsmasq.conf
-dnsmasq --test
-sudo brew services start dnsmasq
-dig @10.3.3.96 app.teamX.test +short      # expect 10.3.3.178
-```
+Never commit tokens, credentials JSON, `.env`, or any private key (`.gitignore` blocks them). The CA *private* key never leaves the edge Mac; clients receive only `pki/ca.crt`. Scripts back up any file before touching it (`~/.config/cn-phase1/backups/INDEX`) and never use `curl -k`.
 
-Allow dnsmasq through the macOS firewall so other Macs can query it.
+## Docs
 
-### Mac 2 — Nginx (Kavya)
+[ARCHITECTURE](docs/ARCHITECTURE.md) - [REQUEST_FLOW](docs/REQUEST_FLOW.md) - [PHASE1](docs/PHASE1.md) (task-by-task checklist) - [PHASE2](docs/PHASE2.md) (extensions A-F) - [LAN_MODE](docs/LAN_MODE.md) - [CLOUDFLARE_MODE](docs/CLOUDFLARE_MODE.md) - [FAILURE_DEMOS](docs/FAILURE_DEMOS.md) - [TROUBLESHOOTING](docs/TROUBLESHOOTING.md) - [VIVA](docs/VIVA.md)
 
-```bash
-brew install nginx openssl
-bash tls/generate-self-signed.sh          # if certs do not exist yet
-nginx -t -c /absolute/path/to/nginx/nginx.conf
-sudo nginx -c /absolute/path/to/nginx/nginx.conf
-```
-
-`nginx.conf` contains an absolute certificate path. If the clone is elsewhere, copy `nginx.conf.template` and replace `REPO_ROOT`. Binding to port 443 requires `sudo`.
-
-### Mac 3 — Backend A (Shubham)
-
-```bash
-cd backend-a
-node server.js        # listens on 0.0.0.0:3001
-```
-
-### Mac 4 — Backend B (Divyanshi)
-
-```bash
-cd backend-b
-node server.js        # listens on 0.0.0.0:3002
-```
-
-Keep all laptops awake and on the same Wi-Fi/LAN during the demo. Turn off macOS firewall stealth mode (or allow ICMP) so ping works between all Macs.
-
----
-
-## 12. Client Setup (DNS and Certificate Trust)
-
-Run on every client Mac (at least two besides Mac 1):
-
-```bash
-# 1. Use Mac 1 as DNS resolver (check service name with: networksetup -listallnetworkservices)
-sudo networksetup -setdnsservers Wi-Fi 10.3.3.96
-sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder
-
-# 2. Trust the project certificate
-sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain tls/certs/server.crt
-
-# 3. Verify
-dig app.teamX.test                 # SERVER line must show 10.3.3.96
-curl -v https://app.teamX.test     # no -k, no IP address
-```
-
-Use macOS's built-in `/usr/bin/curl`; Homebrew curl does not read the system keychain.
-
-To restore the original DNS afterwards:
-
-```bash
-sudo networksetup -setdnsservers Wi-Fi empty
-```
-
----
-
-## 13. Testing Commands
-
-### LAN
-
-```bash
-ping -c 4 10.3.3.96
-ping -c 4 10.3.3.178
-ping -c 4 10.3.3.71
-ping -c 4 10.3.3.104
-```
-
-### DNS
-
-```bash
-dig app.teamX.test               # from a client Mac using Mac 1 as DNS
-dig @10.3.3.96 api.teamX.test
-dig @8.8.8.8 app.teamX.test      # expect NXDOMAIN or timeout
-```
-
-### Backends directly
-
-```bash
-curl -i http://10.3.3.71:3001/api/status
-curl -i http://10.3.3.104:3002/api/status
-```
-
-### Nginx HTTP and HTTPS
-
-```bash
-curl -i http://app.teamX.test:8080/api/status
-curl -v https://app.teamX.test
-```
-
-### Load balancing
-
-```bash
-for i in {1..6}; do curl -si https://app.teamX.test/api/status | grep -i x-backend; done
-```
-
-Expected: `X-Backend` alternates between `A` and `B`.
-
-### Caching headers
-
-```bash
-curl -sI https://app.teamX.test/api/status
-```
-
-### Helper scripts
-
-```bash
-bash scripts/check-lan.sh
-bash scripts/test-dns.sh
-bash scripts/test-https.sh
-bash scripts/test-load-balancing.sh
-bash scripts/validate-project.sh
-```
-
-Scripts report `PASS`, `FAIL`, or `BLOCKED` when a machine is unavailable.
-
----
-
-## 14. Wireshark and Packet Analysis
-
-Capture on a client or on Mac 1/Mac 2 `en0`. Useful filters:
-
-| Evidence | Filter | What to point out |
-| -------- | ------ | ----------------- |
-| DNS | `dns` | Query `A app.teamX.test` from a client to `10.3.3.96:53` (UDP); response `10.3.3.178` with TTL |
-| TCP handshake | `tcp.flags.syn==1` | SYN, SYN-ACK, ACK to `10.3.3.178:443`; ephemeral source port |
-| TLS handshake | `tls` | ClientHello, ServerHello, Certificate (TLS 1.2), then Application Data |
-
-To make the server certificate visible in Wireshark, force TLS 1.2:
-
-```bash
-curl --tlsv1.2 --tls-max 1.2 https://app.teamX.test/
-```
-
-In TLS 1.3 the certificate and HTTP data are encrypted, so only Application Data records are visible. HTTP headers cannot be read in the capture because they are inside encrypted TLS records.
-
-Captures are stored in `evidence/wireshark/`. The existing `tls-handshake.pcapng` contains the TCP handshake to `10.3.3.178:443` and the following TLS records.
-
----
-
-## 15. Failure Demonstration
-
-**Scenario: Option A — stop one backend.**
-
-| Step | Action | Expected result |
-| ---- | ------ | --------------- |
-| Before | Run the 6-request loop | `X-Backend` alternates A and B |
-| Break | On Mac 3, press `Ctrl+C` on `node server.js` | Backend A stops |
-| After | Run the loop again | Only `X-Backend: B`, still HTTP 200 |
-| Restore | On Mac 3 run `node server.js` | A and B alternate again |
-
-Layer affected: application/transport at the backend. DNS and TLS still work, Nginx accepts the client connection, but TCP to `10.3.3.71:3001` is refused and Nginx retries on Backend B.
-
----
-
-## 16. Project Structure
-
-```text
-CN-Private-Network-Platform/
-├── README.md
-├── .gitignore
-├── backend-a/            server.js, package.json        (Mac 3, :3001)
-├── backend-b/            server.js, package.json        (Mac 4, :3002)
-├── dns/                  dnsmasq.conf
-├── nginx/                nginx.conf, nginx.conf.template
-├── tls/                  openssl.cnf, generate-self-signed.sh, certs/server.crt
-├── scripts/              check-lan, test-*, validate-project
-├── docs/                 architecture, CACHING, ip-table, PROJECT_AUDIT,
-│                         troubleshooting
-└── evidence/             backend, caching, dns, lan, load-balancing, network,
-                          nginx, tcp, tls, wireshark
-```
-
----
-
-## 17. Evidence
-
-The project evidence is organised under `evidence/` and matches the final implementation.
-
-| Evidence | Location |
-|---|---|
-| LAN configuration and peer connectivity | `evidence/lan/` and `evidence/network/` |
-| DNS resolution and DNS packet analysis | `evidence/dns/` and `evidence/network/dns.packets.jpeg` |
-| Backend A and Backend B | `evidence/backend/` |
-| Nginx HTTP response | `evidence/nginx/` |
-| Load balancing | `evidence/load-balancing/` |
-| Cache-Control and ETag / 304 | `evidence/caching/` |
-| TCP three-way handshake | `evidence/tcp/` |
-| TLS / HTTPS evidence | `evidence/tls/` |
-| Wireshark packet analysis | `evidence/wireshark/` |
-
-See [`evidence/MANIFEST.md`](evidence/MANIFEST.md) for the complete evidence inventory.
-
----
-
-## 18. Demo Video
-
-Link: (https://drive.google.com/file/d/1gWjS1cxOGXKcK1D9ImrKSpdjjCaPpW-K/view?usp=drive_link)
-
-File name: `CN_Phase1_Section-D_NarCodes_Type1.mp4`
-
-Requirements: MP4, 1080p recommended, maximum 5 minutes, maximum 500 MB, shared as "Anyone with the link can view".
-
-Contents: team intro and setup flow (2 min), how the configuration works (2 min), failure demonstration (1 min).
-
----
-
-## 19. Security Considerations
-
-- Intended for a controlled private LAN.
-- The TLS certificate is self-signed; clients must explicitly trust it.
-- The private key (`server.key`) is never committed.
-- No passwords, API keys, or secrets are stored in the repository.
-- Backends bind to LAN interfaces as the architecture requires; restricting them to the edge only is a Phase 2 task.
-
----
-
-## 20. Limitations
-
-- Self-signed certificate; browsers warn unless it is trusted manually.
-- DNS names exist only on the project LAN.
-- Single DNS server and single Nginx edge are single points of failure (addressed in Phase 2).
-- Basic round-robin with simple failure handling.
-- All four Macs must stay awake on the same LAN; DHCP changes require updating IPs.
-
----
-
-## 21. Conclusion
-
-The project demonstrates a complete private-network application stack:
-
-```text
-Private LAN -> Local DNS -> Nginx Reverse Proxy (HTTPS) -> Round-Robin -> Backend A + Backend B
-```
-
-together with HTTP caching, conditional requests, and packet-level analysis of DNS, TCP and TLS using Wireshark.
+Migration records: [ATTRIBUTION](ATTRIBUTION.md) - [SOURCE_PARITY](docs/SOURCE_PARITY.md) - [VALIDATION](docs/VALIDATION.md). The implementation is adapted with permission from the credited reference repository; no reference private keys, credentials, or evidence were imported.

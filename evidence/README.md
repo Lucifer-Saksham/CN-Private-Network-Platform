@@ -1,44 +1,16 @@
-# Project Evidence
+# Evidence folder
 
-This directory contains screenshots, packet captures, and final demonstration materials for the CN Private Network Platform.
+Store proof here so any item can be found in 30 seconds.
 
-## Evidence locations
-
-| Folder | Purpose |
+| Subfolder | Put here |
 |---|---|
-| `lan/` | Four Mac IP configurations and peer ping |
-| `dns/` | Private DNS question/answer and DNS packet capture |
-| `backend/` | Backend A and Backend B responses |
-| `nginx/` | HTTP response and Nginx validation |
-| `load-balancing/` | Repeated requests showing backend selection |
-| `tls/` | HTTPS certificate verification and TLS evidence |
-| `tcp/` | TCP three-way handshake |
-| `caching/` | Cache-Control, ETag, and 304 evidence |
-| `wireshark/` | Packet captures and Wireshark analysis |
+| `dns/` | `dig` / `nslookup` output, resolver config, Wireshark DNS screenshot |
+| `tcp/` | SYN/SYN-ACK/ACK capture + ports table |
+| `tls/` | `openssl s_client`, certificate details, ClientHello/ServerHello screenshots |
+| `http/` | `curl -v`, `curl -I` (Cache-Control, ETag), 304 demo, browser DevTools |
+| `load-balancing/` | repeated-request output showing A and B |
+| `failures/` | one file per failure demo (break output, observation, rollback) |
 
-
-## Existing evidence
-
-The repository currently contains:
-
-- Network/connectivity screenshot
-- DNS-related screenshot
-- Backend A and Backend B screenshots
-- Nginx-related screenshot
-- Two load-balancing screenshots
-- TCP handshake screenshot
-- TLS handshake screenshot
-- TCP/TLS packet capture
-- Caching and ETag / 304 screenshot
-- DNS packet evidence
-
-See `MANIFEST.md` for file-level status and pending requirements.
-
-## Capture rules
-
-- Use real screenshots and packet captures.
-- Prefer descriptive filenames such as `backend-a-response.png`.
-- Do not invent results or create fake evidence.
-- Do not commit private keys, passwords, tokens, or `.env` files.
-- Do not use `curl -k` for certificate-verification proof.
-- Keep the evidence manifest synchronized with actual files.
+`./bin/collect-evidence` creates `evidence/<timestamp>/` (git-ignored by default; add the good runs with `git add -f`).
+`scripts/capture-packets.sh 60` writes a bounded `.pcap` for Wireshark (also ignored; commit deliberately if size is fine).
+Never place keys, tokens or credentials here.
