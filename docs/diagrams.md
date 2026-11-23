@@ -16,7 +16,7 @@ sequenceDiagram
   participant Cl as Client (macOS resolver)
   participant D as dnsmasq (Mac 1)
   Cl->>D: UDP :53 A? app.teamX.test (src port ephemeral)
-  D-->>Cl: A 10.3.3.178 (Mac 2), TTL 300
+  D-->>Cl: A 10.3.3.139 (Mac 2), TTL 300
   Note over Cl: Only now does the client know WHERE to connect
 ```
 

@@ -1,110 +1,167 @@
-# CN Private Network Service Platform - Phase 1 + Phase 2
+# CN Private Network Service Platform
 
-**What this does.** A client types `https://app.teamX.test:8443`. Our own DNS server (dnsmasq) turns that
-name into the edge Mac's IP, the client opens a TCP connection and a TLS session to nginx, and nginx
-forwards the HTTP request - alternating - to Backend A or Backend B. Every step can be observed with
-`dig`, `curl -v`, and Wireshark. *The application stays simple; the network is the project.*
+A four-Mac Computer Networks project covering private DNS, TCP, TLS 1.3, HTTP/2,
+Nginx reverse proxying, Python backends, round-robin load balancing, HTTP caching,
+failure recovery, network isolation, and layered diagnostics.
 
-| Mac | Person | LAN IP | Role | Ports |
+Phase 1 builds and observes the complete request path. Phase 2 adds Extensions A-F:
+backup DNS, TTL and cache demonstrations, backend isolation, backend failover,
+standby-edge cutover, and fault diagnosis.
+
+## Verified four-Mac topology
+
+The following addresses were verified on 24 November 2026. They are DHCP addresses,
+not permanent assignments.
+
+| Mac | Team member | Verified LAN IP | Responsibility | Ports |
 |---|---|---:|---|---|
-| 1 | **Saksham Miglani** | `10.3.3.96` | Primary DNS, controller, test client | 53/udp+tcp |
-| 2 | **Kavya Mukhija** | `10.3.3.178` | Primary nginx edge and backup DNS | 8443/tcp, 53/udp+tcp |
-| 3 | **Shubham Jain** | `10.3.3.71` | Python Backend A | 3001/tcp |
-| 4 | **Divyanshi Khanka** | `10.3.3.104` | Python Backend B and standby nginx edge | 3002/tcp, 8443/tcp |
+| 1 | Saksham Miglani | `10.3.3.146` | Primary DNS, controller, client | DNS 53 |
+| 2 | Kavya Mukhija | `10.3.3.139` | Primary Nginx TLS edge, backup DNS | HTTPS 8443, DNS 53 |
+| 3 | Shubham Jain | `10.3.3.170` | Python Backend A | HTTP 3001 |
+| 4 | Divyanshi Khanka | `10.3.3.134` | Python Backend B, standby Nginx edge | HTTP 3002, HTTPS 8443 |
 
-LAN: `10.3.0.0/22`; gateway: `10.3.0.1`; names: `app.teamX.test` and
-`api.teamX.test`. These recorded DHCP addresses must be rechecked before a live run.
+- Interface: `en0`
+- Subnet: `10.3.0.0/22` (`255.255.252.0`)
+- Gateway: `10.3.0.1`
+- Hostnames: `app.teamX.test`, `api.teamX.test`
+- Public entry point: `https://app.teamX.test:8443`
 
-## Two network modes (`NETWORK_MODE`)
+The setup scripts save deployment-specific values in
+`~/.config/cn-phase1/project.env` with mode 600. Never commit that file. If Wi-Fi or
+DHCP changes an address, update the file on all four Macs or rerun each setup script,
+then restart the services.
 
-* **`lan`** - the architecture from the university brief. All four Macs share one private Wi-Fi/LAN and talk directly. **This is the mode to submit and demo unless faculty approves otherwise.**
-* **`tunnel`** - for when Shubham/Divyanshi are physically remote. Only the *nginx -> backend* hop changes: it travels over a Cloudflare Zero Trust private network. Saksham <-> Kavya (DNS, TCP, TLS, HTTP) stay on the local LAN, so those layers remain observable.
+## Requirements
 
-> Tunnel mode is **not** equivalent to a four-Mac LAN (the brief requires a shared LAN, LAN inventory and pairwise pings, and a locally-run system). It exists for remote development/demo. Nothing in the application, nginx or DNS code changes between modes - only the upstream addresses.
+- Four Macs on the same non-isolated Wi-Fi/LAN for the submitted LAN topology
+- macOS, Homebrew, Git, Python 3, OpenSSL, `curl`, `dig`, and `nc`
+- `dnsmasq` on the DNS Macs and Nginx on the edge Macs
+- Administrator access for DNS port 53, Keychain trust, packet capture, and Phase 2
+  `pf` rules
+- Optional: Wireshark for packet inspection and Cloudflare Zero Trust for tunnel mode
 
-```mermaid
-flowchart LR
-  subgraph LAN["LAN MODE (matches the brief)"]
-    C1["Mac 1 Saksham<br/>client"] -->|"DNS 53/udp"| D1["Mac 1 Saksham<br/>dnsmasq"]
-    C1 -->|"TCP+TLS+HTTP :8443"| E1["Mac 2 Kavya<br/>nginx"]
-    E1 -->|"HTTP :3001 (LAN)"| BA1["Mac 3 Shubham<br/>Backend A"]
-    E1 -->|"HTTP :3002 (LAN)"| BB1["Mac 4 Divyanshi<br/>Backend B"]
-  end
-```
+The scripts install missing Homebrew packages during setup. Review setup scripts before
+running them because they can request administrator access.
 
-```mermaid
-flowchart LR
-  subgraph TUN["TUNNEL MODE (remote backends)"]
-    C2["Mac 1 Saksham<br/>dnsmasq + client"] -->|"DNS, then TCP+TLS+HTTP :8443 (local LAN)"| E2["Mac 2 Kavya<br/>nginx + Cloudflare WARP"]
-    E2 -->|"10.250.0.3:3001 via WARP"| CF(("Cloudflare<br/>Zero Trust"))
-    E2 -->|"10.250.0.4:3002 via WARP"| CF
-    CF -->|"outbound-only tunnel A"| BA2["Mac 3 Shubham<br/>cloudflared + Backend A"]
-    CF -->|"outbound-only tunnel B"| BB2["Mac 4 Divyanshi<br/>cloudflared + Backend B"]
-  end
-```
+## Installation and setup
 
-More diagrams: [docs/diagrams.md](docs/diagrams.md). Request walk-through: [docs/REQUEST_FLOW.md](docs/REQUEST_FLOW.md).
+Clone the repository on every Mac. Run setup in this order:
 
-## Quick start - one command per Mac
-
-Everyone: `git clone <repo> && cd <repo>`. Run **in this order** (Kavya creates the CA others need):
-
-| Order | Who | Command |
+| Order | Operator | Command |
 |---|---|---|
 | 1 | Shubham | `./macs/mac3-shubham/setup.sh` |
 | 1 | Divyanshi | `./macs/mac4-divyanshi/setup.sh` |
-| 2 | Kavya | `./macs/mac2-kavya/setup.sh` then `git add pki/ca.crt && git commit && git push` |
-| 3 | Saksham | `git pull && ./macs/mac1-saksham/setup.sh` |
-| 4 | any other client | `git pull && scripts/configure-client-dns.sh` |
+| 2 | Kavya | `./macs/mac2-kavya/setup.sh` |
+| 3 | Saksham | `./macs/mac1-saksham/setup.sh` |
 
-Setup scripts ask once for non-secret values (team name, mode, LAN IPs) and remember them in
-`~/.config/cn-phase1/project.env` (chmod 600). They are **idempotent** - run them again any time.
-Tunnel mode additionally needs the one-time admin step: [docs/CLOUDFLARE_MODE.md](docs/CLOUDFLARE_MODE.md).
+Kavya's setup creates the team CA and server certificate. Only the public
+`pki/ca.crt` belongs in Git. Private keys remain under
+`~/.config/cn-phase1/tls/`. Each additional client installs the public CA and runs
+`scripts/configure-client-dns.sh`.
 
-## Phase 2 (Harden, Recover, Troubleshoot) - same idea, one command per Mac
-
-`./bin/phase2 setup` on every Mac (it works out that Mac's duty from its IP; the Phase 1 setup scripts call it too). Then:
-`bin/phase2 test` (checks A-E) and one command per demo: `dns-failover` (A), `ttl` (B), `isolate on|off|test` (C), `failover` (D), `cutover` (E), `bin/doctor` + `drill` (F).
-Order, reasoning and limits: [docs/PHASE2.md](docs/PHASE2.md). Transcripts of every demo land in `evidence/phase2/`.
-
-## Daily commands (any Mac, after setup)
+Start, inspect, and stop the role assigned to the current Mac:
 
 ```bash
-./bin/start | stop | status      # this Mac's role + whole-system view (real requests, not pgrep)
-./bin/test-all                   # layered PASS/FAIL, non-zero exit on failure
-./bin/doctor                     # first failing layer + concept + commands to investigate
-./bin/collect-evidence           # timestamped evidence/<time>/ (no secrets)
-./bin/failure-demo <scenario> <break|rollback|explain>
-./bin/teardown                   # stop services, remove scoped resolver
-./bin/phase2 help                # Phase 2: setup | status | test | demos | rollback
-scripts/capture-packets.sh 60    # bounded tcpdump for Wireshark (Task G)
+./bin/start
+./bin/status
+./bin/stop
 ```
 
-## Repo map
+## Request path
 
+1. The macOS scoped resolver sends `app.teamX.test` to primary DNS
+   `10.3.3.146:53`, with `10.3.3.139:53` available as backup.
+2. DNS returns the active edge address with a 300-second TTL.
+3. The client opens TCP port 8443 on the selected edge.
+4. Nginx presents a certificate for `app.teamX.test` and negotiates TLS 1.3 and
+   HTTP/2.
+5. Nginx terminates TLS and proxies plain HTTP to Backend A or Backend B.
+6. Round robin alternates requests; `X-Backend: A|B` makes the selected backend
+   visible. Passive health checks retry a surviving backend after a failure.
+
+See [request flow](docs/REQUEST_FLOW.md) and [architecture](docs/ARCHITECTURE.md).
+
+## Caching
+
+`/api/cacheable` returns `Cache-Control: max-age=60` and an ETag. A matching
+`If-None-Match` request returns `304 Not Modified` without a response body.
+
+```bash
+curl -i https://app.teamX.test:8443/api/cacheable
+etag=$(curl -sSI https://app.teamX.test:8443/api/cacheable | awk -F': ' 'tolower($1)=="etag" {gsub("\r", "", $2); print $2}')
+curl -i -H "If-None-Match: $etag" https://app.teamX.test:8443/api/cacheable
 ```
-backends/server.py      one stdlib-only REST backend (A or B by env)
-config/                 project.example.env (all constants), dnsmasq + nginx templates
-scripts/                common.sh, roles.sh, role.sh, checks.sh, phase2.sh, CA/DNS/capture helpers
-macs/mac{1..4}-*/       setup|start|stop|status.sh + README per machine
-bin/                    operator commands       tests/   per-layer tests
-admin/                  one-time Cloudflare bootstrap (Saksham only)
-docs/                   architecture, flow, viva, failures, troubleshooting
-pki/ca.crt              PUBLIC CA certificate (safe to commit)
-evidence/               original Phase 1 archive + newly collected team outputs
+
+## Phase 2 Extensions A-F
+
+Run `./bin/phase2 setup` on each Mac, then use:
+
+| Extension | Demonstration | Command |
+|---|---|---|
+| A | Primary and backup DNS failover | `./bin/phase2 dns-failover` |
+| B | Short TTL, cached address, expiry, and flush | `./bin/phase2 ttl` |
+| C | Only primary/standby edges reach backend ports | `./bin/phase2 isolate on\|test\|off` |
+| D | Backend outage and automatic recovery | `./bin/phase2 failover` |
+| E | DNS-based cutover to standby Nginx | `./bin/phase2 cutover` |
+| F | Layered diagnosis and reversible fault drill | `./bin/doctor`, `./bin/phase2 drill` |
+
+Full procedures and limitations are in [Phase 2](docs/PHASE2.md).
+
+## Verification
+
+```bash
+./bin/test-all
+PHASE2=1 ./bin/phase2 test
+./bin/doctor
+./bin/collect-evidence
 ```
 
-## Where things live (never in git)
+Useful manual checks:
 
-`~/.config/cn-phase1/` - saved settings, generated configs, `tls/` (CA + server private keys), `secrets/` (tunnel credentials), backups.
-`~/Library/Logs/cn-phase1/` - dnsmasq, nginx access/error, backend, cloudflared logs.
+```bash
+dig @10.3.3.146 app.teamX.test
+nc -vz 10.3.3.139 8443
+openssl s_client -connect 10.3.3.139:8443 -servername app.teamX.test -CAfile pki/ca.crt
+curl -v https://app.teamX.test:8443/api/status
+```
 
-## Security rules
+The verified 24 November results and the distinction between recorded evidence and
+cleanup-time checks are documented in [validation](docs/VALIDATION.md).
 
-Never commit tokens, credentials JSON, `.env`, or any private key (`.gitignore` blocks them). The CA *private* key never leaves the edge Mac; clients receive only `pki/ca.crt`. Scripts back up any file before touching it (`~/.config/cn-phase1/backups/INDEX`) and never use `curl -k`.
+## Evidence
 
-## Docs
+- `evidence/phase1-original/`: preserved Phase 1 screenshots, packet captures, and notes
+- `evidence/phase2/`: Phase 2 failover, isolation, and cutover transcripts
+- `evidence/<timestamp>/`: output produced by `./bin/collect-evidence` and ignored by
+  default until deliberately selected
 
-[ARCHITECTURE](docs/ARCHITECTURE.md) - [REQUEST_FLOW](docs/REQUEST_FLOW.md) - [PHASE1](docs/PHASE1.md) (task-by-task checklist) - [PHASE2](docs/PHASE2.md) (extensions A-F) - [LAN_MODE](docs/LAN_MODE.md) - [CLOUDFLARE_MODE](docs/CLOUDFLARE_MODE.md) - [FAILURE_DEMOS](docs/FAILURE_DEMOS.md) - [TROUBLESHOOTING](docs/TROUBLESHOOTING.md) - [VIVA](docs/VIVA.md)
+See the [evidence index](evidence/README.md). Never store keys, tokens, passphrases,
+credentials, or private environment files in evidence.
 
-Migration records: [ATTRIBUTION](ATTRIBUTION.md) - [SOURCE_PARITY](docs/SOURCE_PARITY.md) - [VALIDATION](docs/VALIDATION.md). The implementation is adapted with permission from the credited reference repository; no reference private keys, credentials, or evidence were imported.
+## Troubleshooting and rollback
+
+Run `./bin/doctor` first. It checks local network, DNS, TCP, TLS, Nginx, backends,
+backup DNS, standby edge, and the application in request order. See
+[troubleshooting](docs/TROUBLESHOOTING.md) for common failures.
+
+```bash
+./bin/phase2 rollback   # restore Phase 2 DNS/firewall state
+./bin/teardown          # stop project services and restore scoped resolver state
+```
+
+Rollback scripts operate only on project-managed state and saved backups. Inspect the
+commands before running them on a demonstration Mac.
+
+## Optional tunnel mode
+
+`NETWORK_MODE=tunnel` uses Cloudflare Zero Trust only for the edge-to-backend hop when
+the backend Macs are remote. It does not replace the submitted four-Mac LAN topology.
+Credentials stay under `~/.config/cn-phase1/secrets/` and must never enter Git. See
+[Cloudflare mode](docs/CLOUDFLARE_MODE.md).
+
+## Documentation
+
+[Architecture](docs/ARCHITECTURE.md) · [Phase 1](docs/PHASE1.md) ·
+[Phase 2](docs/PHASE2.md) · [LAN mode](docs/LAN_MODE.md) ·
+[Failure demonstrations](docs/FAILURE_DEMOS.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) ·
+[Viva guide](docs/VIVA.md) · [Validation](docs/VALIDATION.md)

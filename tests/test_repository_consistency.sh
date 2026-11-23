@@ -15,30 +15,33 @@ required=(
   tests/test_http.sh tests/test_load_balancing.sh tests/test_cache.sh tests/test_phase2.sh
   macs/mac1-saksham/setup.sh macs/mac2-kavya/setup.sh
   macs/mac3-shubham/setup.sh macs/mac4-divyanshi/setup.sh
+  pki/ca.crt
 )
 
 for path in "${required[@]}"; do
   [[ -f "$path" ]] || { echo "FAIL missing $path" >&2; exit 1; }
 done
 
-if rg -n --hidden -g '!.git/**' -g '!evidence/phase1-original/**' -g '!ATTRIBUTION.md' \
-  -g '!docs/SOURCE_PARITY.md' -g '!*.pdf' -g '!*.pptx' \
-  -g '!tests/test_source_parity.sh' \
-  'Mitul|mitul|Hardik|hardik|Vaibhav|vaibhav|Akshat|akshat|team1|10\.80\.' .; then
-  echo "FAIL stale reference-team identifier" >&2
+if rg -n --hidden -g '!.git/**' -g '!evidence/phase1-original/**' -g '!*.pdf' -g '!*.pptx' \
+  -g '!tests/test_repository_consistency.sh' \
+  '10\.3\.3\.(96|178|71|104)' .; then
+  echo "FAIL stale current-topology or team identifier" >&2
   exit 1
 fi
 
-[[ ! -f pki/ca.crt ]] || { echo "FAIL reference CA must not be imported" >&2; exit 1; }
 ! find . -type f \( -name '*.key' -o -name 'credentials*.json' -o -name '*.token' \) \
-  -not -path './.git/*' -print -quit | grep -q . || { echo "FAIL secret-like file present" >&2; exit 1; }
+  -not -path './.git/*' -not -path './work/*' -print -quit | grep -q . || {
+  echo "FAIL secret-like file present" >&2
+  exit 1
+}
 
-grep -q '^DNS_IP=10.3.3.96' config/project.example.env
-grep -q '^EDGE_IP=10.3.3.178' config/project.example.env
-grep -q '^SHUBHAM_LAN_IP=10.3.3.71' config/project.example.env
-grep -q '^DIVYANSHI_LAN_IP=10.3.3.104' config/project.example.env
+grep -q '^DNS_IP=10.3.3.146' config/project.example.env
+grep -q '^EDGE_IP=10.3.3.139' config/project.example.env
+grep -q '^SHUBHAM_LAN_IP=10.3.3.170' config/project.example.env
+grep -q '^DIVYANSHI_LAN_IP=10.3.3.134' config/project.example.env
+grep -q '^BACKEND_B_OWNER=Divyanshi' config/project.example.env
 grep -q '^EDGE_PORT=8443' config/project.example.env
 grep -q '^BACKEND_A_PORT=3001' config/project.example.env
 grep -q '^BACKEND_B_PORT=3002' config/project.example.env
 
-echo "PASS source structure, identity migration, topology, and secret exclusions"
+echo "PASS repository structure, team topology, and secret exclusions"

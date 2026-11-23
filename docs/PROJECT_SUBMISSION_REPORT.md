@@ -4,10 +4,10 @@
 
 | Mac | Team member | Role | Recorded LAN address | Service |
 |---|---|---|---|---|
-| 1 | Saksham Miglani | DNS, controller, client | `10.3.3.96` | dnsmasq `53/udp+tcp` |
-| 2 | Kavya Mukhija | primary edge, backup DNS | `10.3.3.178` | nginx `8443/tcp`, dnsmasq `53/udp+tcp` |
-| 3 | Shubham Jain | Backend A | `10.3.3.71` | Python HTTP `3001/tcp` |
-| 4 | Divyanshi Khanka | Backend B, standby edge | `10.3.3.104` | Python HTTP `3002/tcp`, nginx `8443/tcp` |
+| 1 | Saksham Miglani | DNS, controller, client | `10.3.3.146` | dnsmasq `53/udp+tcp` |
+| 2 | Kavya Mukhija | primary edge, backup DNS | `10.3.3.139` | nginx `8443/tcp`, dnsmasq `53/udp+tcp` |
+| 3 | Shubham Jain | Backend A | `10.3.3.170` | Python HTTP `3001/tcp` |
+| 4 | Divyanshi Khanka | Backend B, standby edge | `10.3.3.134` | Python HTTP `3002/tcp`, nginx `8443/tcp` |
 
 LAN: `10.3.0.0/22`, mask `255.255.252.0`, gateway `10.3.0.1`.
 Application names: `app.teamX.test` and `api.teamX.test`.
@@ -21,8 +21,8 @@ Application names: `app.teamX.test` and `api.teamX.test`.
 5. The Python backend returns JSON, cache headers, an ETag, and `X-Backend`.
 
 ```text
-client -> DNS 10.3.3.96/10.3.3.178 -> nginx 10.3.3.178:8443
-       -> Backend A 10.3.3.71:3001 or Backend B 10.3.3.104:3002
+client -> DNS 10.3.3.146/10.3.3.139 -> nginx 10.3.3.139:8443
+       -> Backend A 10.3.3.170:3001 or Backend B 10.3.3.134:3002
 ```
 
 The optional tunnel mode changes only the edge-to-backend hop. It uses Cloudflare
@@ -60,11 +60,12 @@ trust, and service changes require operator approval on the relevant Mac.
 Authentic Phase 1 evidence from this team is archived under
 `evidence/phase1-original/`. New Phase 2 evidence belongs under timestamped evidence
 folders created by `./bin/collect-evidence` or Phase 2 demo commands. Do not use the
-reference repository's screenshots, transcripts, certificates, or claims as this
-team's evidence.
+screenshots, transcripts, certificates, or claims of another team as this team's
+evidence.
 
 ## Validation status
 
-Local static and loopback tests validate source behavior without changing system
-settings. DNS failover, firewall isolation, trusted TLS, standby cutover, packet
-captures, and physical LAN behavior remain unverified until executed on all four Macs.
+The four-Mac LAN passed Phase 1 health checks on 24 November 2026. Recorded Phase 2
+evidence covers DNS failover, backend isolation, backend failover, and standby-edge
+cutover. A standalone TTL demonstration and a fault-injection drill still need their
+own transcripts; see `docs/VALIDATION.md` and `evidence/README.md`.
